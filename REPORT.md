@@ -1,5 +1,7 @@
 # Assignment report: forward and inverse kinematics
 
+**Source code:** [github.com/lensraster/robototechnich-assignment-1-2](https://github.com/lensraster/robototechnich-assignment-1-2) (public repository)
+
 This report summarizes the implementation required by [README_EN.md](README_EN.md): forward kinematics (Task 0), Jacobian-based inverse kinematics for planar arms (Tasks 1–3), and an interactive IK demo (Task 4).
 
 ## Environment
