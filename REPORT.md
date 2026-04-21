@@ -1,12 +1,12 @@
-# Assignment report: forward and inverse kinematics
+# Звіт до завдання: пряма та зворотна кінематика
 
-**Source code:** [github.com/lensraster/robototechnich-assignment-1-2](https://github.com/lensraster/robototechnich-assignment-1-2) (public repository)
+**Вихідний код:** [github.com/lensraster/robototechnich-assignment-1-2](https://github.com/lensraster/robototechnich-assignment-1-2) (публічний репозиторій)
 
-This report summarizes the implementation required by [README_EN.md](README_EN.md): forward kinematics (Task 0), Jacobian-based inverse kinematics for planar arms (Tasks 1–3), and an interactive IK demo (Task 4).
+У цьому звіті підсумовано реалізацію за вимогами [README_EN.md](README_EN.md): пряма кінематика (Task 0), зворотна кінематика на основі якобіана для плоских маніпуляторів (Tasks 1–3) та інтерактивне демо IK (Task 4).
 
-## Environment
+## Середовище
 
-Follow the README:
+Дотримуйтесь інструкцій із README:
 
 ```bash
 python3 -m venv venv
@@ -15,54 +15,54 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-On some systems `box2d-py` needs build tools (for example SWIG) or a prebuilt wheel; install any missing system packages if the install step fails.
+На деяких системах `box2d-py` потребує інструменти збірки (наприклад, SWIG) або попередньо зібраний wheel; якщо встановлення не вдається, додайте відсутні системні пакети.
 
-**Report figures** (below) are generated from the same kinematics as the demos (matplotlib, no pygame window): `python tools/generate_report_figures.py` (writes PNGs under `figures/`).
+**Ілюстрації звіту** (нижче) генеруються з тієї самої кінематики, що і в демо (matplotlib, без вікна pygame): `python tools/generate_report_figures.py` (PNG-файли записуються у `figures/`).
 
-## Task 0 — Forward kinematics
+## Task 0 — Пряма кінематика
 
-**Goal:** Compute the end-effector position from the base `p0`, link lengths `L_i`, and relative joint angles `q_i`, so that the green trace (FK) matches the red trace (simulation).
+**Мета:** Обчислити положення енд-ефектора за базовою точкою `p0`, довжинами ланок `L_i` та відносними кутами суглобів `q_i`, щоб зелена траєкторія (FK) збігалася з червоною траєкторією (симуляція).
 
-**Model:** Cumulative angles `φ_i = Σ_{j=0}^{i} q_j`. Each link contributes a displacement `(L_i cos φ_i, L_i sin φ_i)`. The end effector is:
+**Модель:** Накопичені кути `φ_i = Σ_{j=0}^{i} q_j`. Кожна ланка додає зміщення `(L_i cos φ_i, L_i sin φ_i)`. Тоді енд-ефектор:
 
 `p_ee = p_0 + Σ_i (L_i cos φ_i, L_i sin φ_i)`.
 
-**Code:** `forward_kinematics` in `robo_algo/kinematics.py` (used from `task0.py`).
+**Код:** `forward_kinematics` у `robo_algo/kinematics.py` (використовується з `task0.py`).
 
-**Check:** With `TEST_RUN = True` in `task0.py`, the script compares FK to the Box2D end-effector position (`atol=0.1`).
+**Перевірка:** Якщо встановити `TEST_RUN = True` у `task0.py`, скрипт порівнює FK із положенням енд-ефектора з Box2D (`atol=0.1`).
 
 ![Task 0: FK path vs analytic reference (same model as the simulator)](figures/task0_forward_kinematics.png)
 
-*Task 0 — End-effector path from forward kinematics (green) overlaid on the reference trajectory (red dashed); final arm pose and tip are shown.*
+*Task 0 — Траєкторія енд-ефектора з прямої кінематики (зелена) накладена на опорну траєкторію (червона пунктирна); також показано фінальну позу маніпулятора і його кінчик.*
 
-## Tasks 1–3 — Jacobian and inverse kinematics
+## Tasks 1–3 — Якобіан і зворотна кінематика
 
-**Jacobian:** For a planar revolute chain, with `φ_i` as above,
+**Якобіан:** Для плоского послідовного маніпулятора з обертальними суглобами, використовуючи `φ_i` вище:
 
 - `∂x/∂q_k = Σ_{i≥k} (-L_i sin φ_i)`
 - `∂y/∂q_k = Σ_{i≥k} (L_i cos φ_i)`
 
-This yields `J ∈ ℝ^{2×n}` (rows: x and y partials).
+Отримуємо `J ∈ ℝ^{2×n}` (рядки — похідні за `x` та `y`).
 
-**IK method:** Levenberg–Marquardt / damped least squares. At each iteration, with error `e = p_goal - p_ee(q)`:
+**Метод IK:** Levenberg–Marquardt / damped least squares. На кожній ітерації, для похибки `e = p_goal - p_ee(q)`:
 
 `(J J^T + λ^2 I) v = e`, `Δq = J^T v`
 
-with damping `λ` (implementation uses `lm_lambda` in `inverse_kinematics`). The step is scaled by `step_scale` (default 1). Iteration stops when `‖e‖ < tol` or `max_iter` is reached.
+де `λ` — коефіцієнт демпфування (в реалізації це `lm_lambda` у `inverse_kinematics`). Крок масштабується параметром `step_scale` (типово 1). Ітерації зупиняються, коли `‖e‖ < tol` або досягнуто `max_iter`.
 
-Reference (course sheet):
+Опорна формула (матеріали курсу):
 
 ![IK iteration sketch](media/ik_formulae.png)
 
-**Nullspace (redundant arms, n > 2):** An extra term `(I - J^+ J) (q_pref - q)` with `q_pref = 0` biases the solution toward a neutral posture and reduces drift when many joint configurations solve the same end-effector pose. This is optional (`use_nullspace=True` by default) and only applied when there are more than two joints.
+**Nullspace (для надлишкових маніпуляторів, n > 2):** Додатковий член `(I - J^+ J) (q_pref - q)` з `q_pref = 0` зміщує розв’язок у бік нейтральної пози та зменшує дрейф, коли одну й ту саму позу енд-ефектора можна досягти багатьма конфігураціями суглобів. Опція вмикається через `use_nullspace=True` (типово) і застосовується лише для маніпуляторів із більш ніж двома суглобами.
 
-**Drawing logic:** For each list of polylines (`get_drawing1()`, `get_drawing2()`, `get_drawing3()`), the controller visits waypoints in order. While `ArmController` is idle, the next target is taken, `inverse_kinematics` computes joint angles, and `move_to_angles` interpolates motion subject to `MAX_SPEED`. Each frame: `controller.step()`, then `arm.draw()`.
+**Логіка малювання:** Для кожного списку поліліній (`get_drawing1()`, `get_drawing2()`, `get_drawing3()`) контролер проходить точки послідовно. Коли `ArmController` у стані очікування (idle), береться наступна цільова точка, `inverse_kinematics` обчислює кути, а `move_to_angles` інтерполює рух із обмеженням `MAX_SPEED`. На кожному кадрі викликаються: `controller.step()`, потім `arm.draw()`.
 
-| Task | Links / DOF | Data |
+| Task | Ланки / DOF | Дані |
 |------|-------------|------|
-| 1 | 3 | `get_drawing1()` — one closed polyline |
-| 2 | 4 | `get_drawing2()` — two sine/cosine paths |
-| 3 | 6 | `get_drawing3()` — multiple separate shapes |
+| 1 | 3 | `get_drawing1()` — одна замкнена полілінія |
+| 2 | 4 | `get_drawing2()` — дві траєкторії синус/косинус |
+| 3 | 6 | `get_drawing3()` — кілька окремих фігур |
 
 ![Task 1: IK following the closed polyline (targets in gray, solved path in red)](figures/task1_ik_drawing.png)
 
@@ -70,26 +70,26 @@ Reference (course sheet):
 
 ![Task 3: IK across multiple shapes (6 DOF)](figures/task3_ik_drawing.png)
 
-## Task 4 — Interactive IK
+## Task 4 — Інтерактивна IK
 
-**Behavior:** The mouse sets a target point in world coordinates (green circle). Whenever the controller is idle, joint targets are recomputed with `inverse_kinematics` toward the current mouse position, then `move_to_angles` runs; `step()` and `arm.draw()` run every frame.
+**Поведінка:** Мишею задається цільова точка у світових координатах (зелений маркер). Щоразу, коли контролер у стані idle, цільові кути обчислюються через `inverse_kinematics` для поточної позиції миші, після чого запускається `move_to_angles`; на кожному кадрі виконуються `step()` та `arm.draw()`.
 
-**What to try (as in the README):** Move the target slowly vs quickly, choose points clearly outside the reachable workspace, and compare how the arm behaves when the goal jumps (tracking lag vs smooth motion). Adjust `MAX_SPEED` in `task4.py` to see how interpolation limits affect following.
+**Що варто спробувати (як у README):** Рухати ціль повільно та швидко, вибирати точки явно поза робочою зоною та порівнювати реакцію маніпулятора при різких змінах цілі (затримка стеження проти плавності). Змінюйте `MAX_SPEED` у `task4.py`, щоб побачити вплив обмеження швидкості інтерполяції.
 
 ![Task 4: Representative pose tracking a goal (interactive demo uses the mouse)](figures/task4_interactive.png)
 
-## File map
+## Карта файлів
 
-| File | Role |
+| Файл | Роль |
 |------|------|
-| `robo_algo/kinematics.py` | FK, Jacobian, iterative IK (LM + optional nullspace) |
-| `robo_algo/drawing_data.py` | Polyline definitions for Tasks 1–3 (numpy-only) |
-| `tools/generate_report_figures.py` | Regenerate `figures/*.png` for this report |
-| `task0.py` | Task 0 visualization |
-| `task1.py` … `task3.py` | IK drawing demos |
-| `task4.py` | Interactive demo |
+| `robo_algo/kinematics.py` | FK, якобіан, ітеративна IK (LM + опційний nullspace) |
+| `robo_algo/drawing_data.py` | Опис поліліній для Tasks 1–3 (лише numpy) |
+| `tools/generate_report_figures.py` | Повторна генерація `figures/*.png` для цього звіту |
+| `task0.py` | Візуалізація Task 0 |
+| `task1.py` … `task3.py` | Демо IK для малювання |
+| `task4.py` | Інтерактивне демо |
 
-## How to run
+## Як запускати
 
 ```bash
 source ./venv/bin/activate
@@ -100,8 +100,8 @@ python task3.py
 python task4.py
 ```
 
-Close any window with Escape or the window close button.
+Будь-яке вікно можна закрити клавішею Escape або кнопкою закриття вікна.
 
-## Summary
+## Підсумок
 
-Forward kinematics follows the same cumulative-angle convention as `RoboticArm` in `robo_algo/arm.py`. Inverse kinematics uses a damped Jacobian transpose (Levenberg–Marquardt) update with an optional nullspace projection for redundant manipulators, integrated with the provided `ArmController` for smooth motion along polylines and toward a moving target.
+Пряма кінематика реалізована з тією самою угодою про накопичення кутів, що й у `RoboticArm` з `robo_algo/arm.py`. Зворотна кінематика використовує демпфоване оновлення через транспонований якобіан (Levenberg–Marquardt) з опційною проєкцією в nullspace для надлишкових маніпуляторів і інтегрована з наданим `ArmController` для плавного руху вздовж поліліній та до рухомої цілі.
