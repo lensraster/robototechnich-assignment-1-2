@@ -17,6 +17,8 @@ pip install -e .
 
 On some systems `box2d-py` needs build tools (for example SWIG) or a prebuilt wheel; install any missing system packages if the install step fails.
 
+**Report figures** (below) are generated from the same kinematics as the demos (matplotlib, no pygame window): `python tools/generate_report_figures.py` (writes PNGs under `figures/`).
+
 ## Task 0 — Forward kinematics
 
 **Goal:** Compute the end-effector position from the base `p0`, link lengths `L_i`, and relative joint angles `q_i`, so that the green trace (FK) matches the red trace (simulation).
@@ -28,6 +30,10 @@ On some systems `box2d-py` needs build tools (for example SWIG) or a prebuilt wh
 **Code:** `forward_kinematics` in `robo_algo/kinematics.py` (used from `task0.py`).
 
 **Check:** With `TEST_RUN = True` in `task0.py`, the script compares FK to the Box2D end-effector position (`atol=0.1`).
+
+![Task 0: FK path vs analytic reference (same model as the simulator)](figures/task0_forward_kinematics.png)
+
+*Task 0 — End-effector path from forward kinematics (green) overlaid on the reference trajectory (red dashed); final arm pose and tip are shown.*
 
 ## Tasks 1–3 — Jacobian and inverse kinematics
 
@@ -44,6 +50,10 @@ This yields `J ∈ ℝ^{2×n}` (rows: x and y partials).
 
 with damping `λ` (implementation uses `lm_lambda` in `inverse_kinematics`). The step is scaled by `step_scale` (default 1). Iteration stops when `‖e‖ < tol` or `max_iter` is reached.
 
+Reference (course sheet):
+
+![IK iteration sketch](media/ik_formulae.png)
+
 **Nullspace (redundant arms, n > 2):** An extra term `(I - J^+ J) (q_pref - q)` with `q_pref = 0` biases the solution toward a neutral posture and reduces drift when many joint configurations solve the same end-effector pose. This is optional (`use_nullspace=True` by default) and only applied when there are more than two joints.
 
 **Drawing logic:** For each list of polylines (`get_drawing1()`, `get_drawing2()`, `get_drawing3()`), the controller visits waypoints in order. While `ArmController` is idle, the next target is taken, `inverse_kinematics` computes joint angles, and `move_to_angles` interpolates motion subject to `MAX_SPEED`. Each frame: `controller.step()`, then `arm.draw()`.
@@ -54,17 +64,27 @@ with damping `λ` (implementation uses `lm_lambda` in `inverse_kinematics`). The
 | 2 | 4 | `get_drawing2()` — two sine/cosine paths |
 | 3 | 6 | `get_drawing3()` — multiple separate shapes |
 
+![Task 1: IK following the closed polyline (targets in gray, solved path in red)](figures/task1_ik_drawing.png)
+
+![Task 2: IK along two sinusoidal paths (4 DOF; path subsampled for the figure)](figures/task2_ik_drawing.png)
+
+![Task 3: IK across multiple shapes (6 DOF)](figures/task3_ik_drawing.png)
+
 ## Task 4 — Interactive IK
 
 **Behavior:** The mouse sets a target point in world coordinates (green circle). Whenever the controller is idle, joint targets are recomputed with `inverse_kinematics` toward the current mouse position, then `move_to_angles` runs; `step()` and `arm.draw()` run every frame.
 
 **What to try (as in the README):** Move the target slowly vs quickly, choose points clearly outside the reachable workspace, and compare how the arm behaves when the goal jumps (tracking lag vs smooth motion). Adjust `MAX_SPEED` in `task4.py` to see how interpolation limits affect following.
 
+![Task 4: Representative pose tracking a goal (interactive demo uses the mouse)](figures/task4_interactive.png)
+
 ## File map
 
 | File | Role |
 |------|------|
 | `robo_algo/kinematics.py` | FK, Jacobian, iterative IK (LM + optional nullspace) |
+| `robo_algo/drawing_data.py` | Polyline definitions for Tasks 1–3 (numpy-only) |
+| `tools/generate_report_figures.py` | Regenerate `figures/*.png` for this report |
 | `task0.py` | Task 0 visualization |
 | `task1.py` … `task3.py` | IK drawing demos |
 | `task4.py` | Interactive demo |

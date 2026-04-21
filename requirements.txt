@@ -2,3 +2,4 @@ pyglet
 pygame
 opencv-python>=4.7
 box2d-py
+matplotlib>=3.7

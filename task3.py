@@ -8,7 +8,7 @@ from pygame.locals import (QUIT, KEYDOWN, K_ESCAPE)
 from robo_algo.arm import RoboticArmPlotter
 from robo_algo.arm_controller import ArmController
 from robo_algo.kinematics import inverse_kinematics
-from robo_algo.plotter_graphs import get_drawing3
+from robo_algo.drawing_data import get_drawing3
 from robo_algo.constants import *
 import robo_algo.core as core
 from robo_algo.core import Color
